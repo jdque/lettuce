@@ -1,5 +1,20 @@
 import K from './builder';
+import Commander from './commander';
 import {FSM} from '../lib/royal';
+
+let C = Commander({
+  'Draw': {
+    commit: ({element, parent}) => {
+      parent.add(element);
+      parent.getLayer().draw();
+      return {element, parent};
+    },
+    rollback: ({element, parent}) => {
+      element.destroy();
+      parent.getLayer().draw();
+    }
+  }
+});
 
 function GridLines(container, numCols, numRows, lineStyle) {
   let width = container.width();
@@ -44,24 +59,24 @@ function Borders(container, borderStyle) {
 
 function Drawable(container, cursor) {
   let stage = container.getStage();
-  let $mouse = FSM.create(['idle', 'dragging_line', 'dragging_resize_horz', 'dragging_resize_vert']);
+  let $mouse = FSM.create(['idle', 'drag_line', 'drag_resize_horz', 'drag_resize_vert']);
 
   $mouse.when('idle', ({data}) => {
     let onMouseDown = (ev) => {
-      if (true) {
+      if (false) {
         let pointerPos = container.getStage().getPointerPosition();
         let grid = container.getStage().getIntersection(pointerPos, '.grid');
         if (grid) {
           if (Math.abs(pointerPos.x - (grid.getAbsolutePosition().x + grid.getAttr('width'))) < 8) {
-            $mouse.set('dragging_resize_horz', {grid: grid});
+            $mouse.set('drag_resize_horz', {grid: grid});
           }
           if (Math.abs(pointerPos.y - (grid.getAbsolutePosition().y + grid.getAttr('height'))) < 8) {
-            $mouse.set('dragging_resize_vert', {grid: grid});
+            $mouse.set('drag_resize_vert', {grid: grid});
           }
         }
       }
       else {
-        $mouse.set('dragging_line');
+        $mouse.set('drag_line');
       }
     }
 
@@ -72,7 +87,7 @@ function Drawable(container, cursor) {
     }
   });
 
-  $mouse.when('dragging_line', ({data}) => {
+  $mouse.when('drag_line', ({data}) => {
     let containerPos = container.getAbsolutePosition();
     let startPt = cursor ? cursor.getAbsolutePosition() : container.getStage().getPointerPosition();
     let endPt = startPt;
@@ -91,11 +106,17 @@ function Drawable(container, cursor) {
     }
 
     let onMouseUp = (ev) => {
-      if (startPt.x === endPt.x && startPt.y === endPt.y) {
-        let layer = line.getLayer().draw();
-        line.destroy();
-        layer.draw();
+      if (startPt.x !== endPt.x || startPt.y !== endPt.y) {
+        C('Draw', {
+          element: K('Line', {...line.getAttrs()}),
+          parent: line.getParent()
+        });
       }
+
+      let layer = line.getLayer().draw();
+      line.destroy();
+      layer.draw();
+
       $mouse.set('idle');
     }
 
@@ -108,7 +129,7 @@ function Drawable(container, cursor) {
     }
   });
 
-  $mouse.when('dragging_resize_horz', ({data}) => {
+  $mouse.when('drag_resize_horz', ({data}) => {
     let grid = data.grid;
     let origWidth = grid.getAttr('width');
     let startPt = container.getStage().getPointerPosition();
@@ -133,7 +154,7 @@ function Drawable(container, cursor) {
     };
   });
 
-  $mouse.when('dragging_resize_vert', ({data}) => {
+  $mouse.when('drag_resize_vert', ({data}) => {
     let grid = data.grid;
     let origHeight = grid.getAttr('height');
     let startPt = container.getStage().getPointerPosition();
@@ -162,15 +183,11 @@ function Drawable(container, cursor) {
 }
 
 function GridContainer({resolution, ...style}) {
-  let container = K('Container', {...style},
+  return K('Container', {resolution, ...style}, '.grid',
     K('Rect', {width: style.width, height: style.height}),
     [GridLines, resolution, resolution, {stroke: 'black', strokeWidth: 1}],
     [Borders, {stroke: 'black', strokeWidth: 1}]
   );
-  container.setAttr('resolution', resolution);
-  container.addName('grid');
-
-  return container;
 }
 
 //---------------------------------------------------------
@@ -258,3 +275,12 @@ K('Stage', {container: 'container', width: 800, height: 600},
   ),
   [disableRightClick]
 )
+
+document.body.addEventListener('keyup', (ev) => {
+  if (ev.code === 'KeyZ' && ev.ctrlKey) {
+    C('Undo');
+  }
+  else if (ev.code === 'KeyY' && ev.ctrlKey) {
+    C('Redo');
+  }
+})
