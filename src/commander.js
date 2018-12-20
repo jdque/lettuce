@@ -23,7 +23,10 @@ export default function (commands) {
 
   let scrub = () => {
     for (let i = log.length - 1; i > currentIdx; i--) {
-      log.pop();
+      let lastEntry = log.pop();
+      if (lastEntry.command.destroy) {
+        lastEntry.command.destroy(lastEntry.rollbackProps);
+      }
     }
   }
 
