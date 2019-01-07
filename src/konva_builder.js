@@ -5,7 +5,7 @@ export default function (tag, props = {}, ...children) {
   if (tag instanceof Konva.Node) {
     elem = tag;
   }
-  if (typeof tag === 'string') {
+  else if (typeof tag === 'string') {
     elem = new Konva[tag](props);
   }
   else if (typeof tag === 'function') {
@@ -13,11 +13,6 @@ export default function (tag, props = {}, ...children) {
   }
   else {
     throw new Error('Invalid tag');
-  }
-
-  //FIX
-  if (elem instanceof Konva.Container) {
-    elem._validateAdd = (node) => {};
   }
 
   let taggedChildren = {};
@@ -58,7 +53,10 @@ export default function (tag, props = {}, ...children) {
         elem.addName(child.slice(1));
       }
       else if (child[0] === '#') {
-        elem.setId(child.slice(1))
+        elem.setId(child.slice(1));
+      }
+      else {
+        //NO-OP
       }
     }
     else {

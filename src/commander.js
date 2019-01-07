@@ -1,4 +1,13 @@
-export default function (commands) {
+export function Command({commit, rollback, destroy}) {
+  return {
+    isCommand: true,
+    commit: commit || function () {},
+    rollback: rollback || function () {},
+    destroy: destroy  || function () {},
+  };
+}
+
+export function Commander(commands) {
   let log = [];
   let currentIdx = -1;
   let locked = false;
@@ -32,7 +41,7 @@ export default function (commands) {
 
   let execute = (name, props) => {
     let command = commands[name];
-    if (!command) {
+    if (!command || !command.isCommand) {
       throw new Error(`Unrecognized command: ${name}`);
     }
     let newEntry = {
