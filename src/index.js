@@ -1,13 +1,8 @@
 import H from './html_builder';
 import K from './konva_builder';
 import {Command, Commander} from './commander';
+import {Selector} from './selector';
 import {FSM} from '../lib/royal';
-
-let App = {
-  clipboard: [],
-  shiftMod: false,
-  ctrlMod: false
-};
 
 let DrawCommand = Command({
   commit: ({elements, parent}) => {
@@ -106,6 +101,10 @@ function resizeBy(element, dx = 0, dy = 0) {
   });
 }
 
+function draw(element) {
+  element.getLayer().draw();
+}
+
 function copyBounds(container, bounds) {
   for (let element of App.clipboard) {
     element.destroy();
@@ -131,6 +130,80 @@ function pastePosition(container, position) {
   if (clones.length > 0) {
     C('Draw', {elements: clones, parent: container});
   }
+}
+
+function RectPreview(buildRectFunc) {
+  let rect = null;
+  let startX = null;
+  let startY = null;
+
+  return {
+    update: (container, pt) => {
+      if (rect == null) {
+        rect = buildRectFunc();
+        rect.setAttrs({
+          x: pt.x,
+          y: pt.y
+        });
+        startX = pt.x;
+        startY = pt.y;
+        container.add(rect);
+      }
+      rect.setAttrs({
+        x: Math.min(pt.x, startX),
+        y: Math.min(pt.y, startY),
+        width: Math.abs(pt.x - startX),
+        height: Math.abs(pt.y - startY)
+      });
+    },
+    destroy: () => {
+      if (rect != null) {
+        rect.destroy();
+        rect = null;
+      }
+    },
+    get: () => {
+      return rect;
+    },
+    isValid: () => {
+      return rect != null;
+    }
+  };
+}
+
+function LinePreview(buildLineFunc) {
+  let line = null;
+  let startX = null;
+  let startY = null;
+
+  return {
+    update: (container, pt) => {
+      if (line == null) {
+        line = buildLineFunc();
+        line.setAttrs({
+          points: [pt.x, pt.y, pt.x, pt.y]
+        });
+        startX = pt.x;
+        startY = pt.y;
+        container.add(line);
+      }
+      line.setAttrs({
+        points: [startX, startY, pt.x, pt.y]
+      });
+    },
+    destroy: () => {
+      if (line != null) {
+        line.destroy();
+        line = null;
+      }
+    },
+    get: () => {
+      return line;
+    },
+    isValid: () => {
+      return line != null;
+    }
+  };
 }
 
 function GridLines(container, numCols, numRows, lineStyle) {
@@ -175,15 +248,15 @@ function Borders(container, borderStyle) {
 }
 
 function Drawable(container, cursor) {
-  let $mouse = FSM.create(['idle', 'drag_line', 'drag_select', 'drag_resize_horz', 'drag_resize_vert']);
+  let $mouse = FSM.create(['idle', 'drag_line', 'drag_select']);
 
-  $mouse.when('idle', ({data}) => {
+  $mouse.when('idle', ($self) => {
     let onMouseDown = (ev) => {
       if (App.shiftMod) {
-        $mouse.set('drag_select');
+        $self.set('drag_select');
       }
       else {
-        $mouse.set('drag_line');
+        $self.set('drag_line');
       }
     }
 
@@ -194,38 +267,32 @@ function Drawable(container, cursor) {
     }
   });
 
-  $mouse.when('drag_line', ({data}) => {
-    let containerPos = container.getAbsolutePosition();
-    let startPt = cursor ? cursor.getAbsolutePosition() : container.getStage().getPointerPosition();
-    let endPt = startPt;
-    let line = K('Line', {
-      points: [startPt.x - containerPos.x, startPt.y - containerPos.y, endPt.x - containerPos.x, endPt.y - containerPos.y],
-      stroke: 'red',
-      strokeWidth: 2
-    });
-    container.add(line);
+  $mouse.when('drag_line', ($self) => {
+    let linePreview = LinePreview(() => K('Line', {stroke: 'red', strokeWidth: 2}));
 
     let onMouseMove = (ev) => {
       let containerPos = container.getAbsolutePosition();
-      endPt = cursor ? cursor.getAbsolutePosition() : container.getStage().getPointerPosition();
-      line.setAttr('points', [startPt.x - containerPos.x, startPt.y - containerPos.y, endPt.x - containerPos.x, endPt.y - containerPos.y]);
-      line.getLayer().draw();
+      let pos = cursor ? cursor.getAbsolutePosition() : container.getStage().getPointerPosition();
+      linePreview.update(container, {x: pos.x - containerPos.x, y: pos.y - containerPos.y});
+      container.getLayer().draw();
     }
 
     let onMouseUp = (ev) => {
-      let foregroundGroup = container.getStage().findOne('#foreground');
-      if (startPt.x !== endPt.x || startPt.y !== endPt.y) {
-        C('Draw', {
-          elements: [K('Line', {...line.getAttrs()})],
-          parent: foregroundGroup
-        });
+      if (linePreview.isValid()) {
+        let foregroundGroup = container.getStage().findOne('#foreground');
+        let line = linePreview.get();
+        let [startX, startY, endX, endY] = line.getAttr('points');
+        if (startX !== endX || startY !== endY) {
+          C('Draw', {
+            elements: [K('Line', {...line.getAttrs()})],
+            parent: foregroundGroup
+          });
+        }
+        linePreview.destroy();
+        container.getLayer().draw();
       }
 
-      let layer = line.getLayer().draw();
-      line.destroy();
-      layer.draw();
-
-      $mouse.set('idle');
+      $self.set('idle');
     }
 
     container.on('mousemove.drag_line', onMouseMove);
@@ -237,46 +304,26 @@ function Drawable(container, cursor) {
     }
   });
 
-  $mouse.when('drag_select', ({data}) => {
-    let containerPos = container.getAbsolutePosition();
-    let startPt = cursor ? cursor.getAbsolutePosition() : container.getStage().getPointerPosition();
-    let endPt = startPt;
-    let rect = K('Rect', {stroke: 'blue', strokeWidth: 1});
-    rect.setAttrs({
-      x: Math.min(startPt.x, endPt.x) - containerPos.x,
-      y: Math.min(startPt.y, endPt.y) - containerPos.y,
-      width: Math.abs(endPt.x - startPt.x),
-      height: Math.abs(endPt.y - startPt.y)
-    });
-    container.add(rect);
+  $mouse.when('drag_select', ($self) => {
+    let selectionPreview = RectPreview(() => K('Rect', {stroke: 'blue', strokeWidth: 2}));
 
     let onMouseMove = (ev) => {
       let containerPos = container.getAbsolutePosition();
-      endPt = cursor ? cursor.getAbsolutePosition() : container.getStage().getPointerPosition();
-
-      rect.setAttrs({
-        x: Math.min(startPt.x, endPt.x) - containerPos.x,
-        y: Math.min(startPt.y, endPt.y) - containerPos.y,
-        width: Math.abs(endPt.x - startPt.x),
-        height: Math.abs(endPt.y - startPt.y)
-      });
-      rect.getLayer().draw();
+      let pos = cursor ? cursor.getAbsolutePosition() : container.getStage().getPointerPosition();
+      selectionPreview.update(container, {x: pos.x - containerPos.x, y: pos.y - containerPos.y});
+      container.getLayer().draw();
     }
 
     let onMouseUp = (ev) => {
-      let foregroundGroup = container.getStage().findOne('#foreground');
-      if (App.ctrlMod) {
-        pastePosition(foregroundGroup, {...rect.position()});
-      }
-      else {
+      if (selectionPreview.isValid()) {
+        let foregroundGroup = container.getStage().findOne('#foreground');
+        let rect = selectionPreview.get();
         copyBounds(foregroundGroup, {...rect.size(), ...rect.position()});
+        selectionPreview.destroy();
+        container.getLayer().draw();
       }
 
-      let layer = rect.getLayer().draw();
-      rect.destroy();
-      layer.draw();
-
-      $mouse.set('idle');
+      $self.set('idle');
     }
 
     container.on('mousemove.drag_select', onMouseMove);
@@ -314,14 +361,21 @@ function RegionImage({image, regionX, regionY, regionWidth, regionHeight, ...sty
 
 //---------------------------------------------------------
 
-let getSnapPos = (gridContainer, pos) => {
-  let gridX = gridContainer.getAttr('x');
-  let gridY = gridContainer.getAttr('y');
-  let spacingX = gridContainer.getAttr('width') / gridContainer.getAttr('resolutionX');
-  let spacingY = gridContainer.getAttr('height') / gridContainer.getAttr('resolutionY');
+let $K = Selector({translateBy, resizeBy, draw});
+
+let getCellSize = (gridContainer) => {
   return {
-    x: Math.round((pos.x - gridX) / spacingX) * spacingX + gridX,
-    y: Math.round((pos.y - gridY) / spacingY) * spacingY + gridY
+    width: gridContainer.getAttr('width') / gridContainer.getAttr('resolutionX'),
+    height: gridContainer.getAttr('height') / gridContainer.getAttr('resolutionY')
+  };
+}
+
+let getSnapPos = (gridContainer, pos) => {
+  let {x: gridX, y: gridY} = gridContainer.position();
+  let {width: cellWidth, height: cellHeight} = getCellSize(gridContainer);
+  return {
+    x: Math.round((pos.x - gridX) / cellWidth) * cellWidth + gridX,
+    y: Math.round((pos.y - gridY) / cellHeight) * cellHeight + gridY
   };
 }
 
@@ -346,22 +400,18 @@ let addGridEvents = (group, cursor) => {
     if (grid) {
       let delta = ev.evt.deltaY > 0 ? -1 : 1;
       incrementGridResolution(grid, delta, delta);
+      grid.getLayer().draw();
       ev.evt.preventDefault();
     }
   });
 
   group.on('click', (ev) => {
     if (ev.evt.which === 3) {
-      if (App.shiftMod) {
+      let cursorPos = cursor.getAbsolutePosition();
+      let newGrid = K(GridContainer, {resolutionX: 2, resolutionY: 2, x: cursorPos.x, y: cursorPos.y, width: 128, height: 128});
+      let backgroundGroup = group.getStage().findOne('#background');
 
-      }
-      else {
-        let cursorPos = cursor.getAbsolutePosition();
-        let newGrid = K(GridContainer, {resolutionX: 2, resolutionY: 2, x: cursorPos.x, y: cursorPos.y, width: 128, height: 128});
-        let backgroundGroup = group.getStage().findOne('#background');
-
-        C('Draw', {elements: [newGrid], parent: backgroundGroup});
-      }
+      C('Draw', {elements: [newGrid], parent: backgroundGroup});
     }
   });
 
@@ -386,33 +436,7 @@ let addGridEvents = (group, cursor) => {
 };
 
 let addKeyboardEvents = (stage) => {
-  let selectionRect = null;
-
-  let createOrUpdateSelectionRect = (container, pt) => {
-    if (!selectionRect) {
-      selectionRect = K('Rect', {stroke: 'blue', strokeWidth: 2});
-      selectionRect.setAttrs({
-        x: pt.x,
-        y: pt.y
-      });
-      container.add(selectionRect);
-    }
-    selectionRect.setAttrs({
-      x: Math.min(selectionRect.x(), pt.x),
-      y: Math.min(selectionRect.y(), pt.y),
-      width: Math.abs(pt.x - selectionRect.x()),
-      height: Math.abs(pt.y - selectionRect.y())
-    });
-  }
-
-  let removeSelectionRect = () => {
-    if (selectionRect) {
-      let foregroundGroup = stage.findOne('#foreground');
-      copyBounds(foregroundGroup, {...selectionRect.size(), ...selectionRect.position()});
-      selectionRect.destroy();
-      selectionRect = null;
-    }
-  }
+  let selectionPreview = RectPreview(() => K('Rect', {stroke: 'blue', strokeWidth: 2}));
 
   stage.container().addEventListener('keydown', (ev) => {
     let cursor = stage.findOne('#cursor');
@@ -421,103 +445,89 @@ let addKeyboardEvents = (stage) => {
       return;
     }
 
-    let xStep = grid.getAttr('width') / grid.getAttr('resolutionX');
-    let yStep = grid.getAttr('height') / grid.getAttr('resolutionY');
+    let {width: cellWidth, height: cellHeight} = getCellSize(grid);
 
-    if (ev.ctrlKey) {
-      if (ev.code === 'KeyC') {
-        let foregroundGroup = stage.findOne('#foreground');
-        copyBounds(foregroundGroup, {...cursor.position(), width: xStep, height: yStep});
-      }
-      else if (ev.code === 'KeyV') {
-        let foregroundGroup = stage.findOne('#foreground');
-        pastePosition(foregroundGroup, cursor.position());
-      }
-      else if (ev.code === 'KeyA') {
-        resizeBy(grid, -xStep, 0);
-        incrementGridResolution(grid, -1, 0);
+    if (ev.shiftKey) {
+      if (ev.code === 'KeyA') {
+        $K(grid)
+          .resizeBy(-cellWidth, 0)
+          .do([incrementGridResolution, -1, 0]);
       }
       else if (ev.code === 'KeyD') {
-        resizeBy(grid, +xStep, 0);
-        incrementGridResolution(grid, +1, 0);
+        $K(grid)
+          .resizeBy(+cellWidth, 0)
+          .do([incrementGridResolution, +1, 0]);
       }
       else if (ev.code === 'KeyW') {
-        resizeBy(grid, 0, -yStep);
-        incrementGridResolution(grid, 0, -1);
+        $K(grid)
+          .resizeBy(0, -cellHeight)
+          .do([incrementGridResolution, 0, -1]);
       }
       else if (ev.code === 'KeyS') {
-        resizeBy(grid, 0, +yStep);
-        incrementGridResolution(grid, 0, +1);
+        $K(grid)
+          .resizeBy(0, +cellHeight)
+          .do([incrementGridResolution, 0, +1]);
       }
-      else {
-        return;
-      }
-    }
-    else if (ev.shiftKey) {
-      if (ev.code === 'ArrowLeft') {
-        translateBy(cursor, -xStep, 0);
-        createOrUpdateSelectionRect(cursor.getParent(), cursor.position());
-        cursor.getLayer().draw();
+      else if (ev.code === 'ArrowLeft') {
+        $K(cursor).translateBy(-cellWidth, 0);
+        selectionPreview.update(cursor.getParent(), cursor.position());
+        $K(cursor).draw();
       }
       else if (ev.code === 'ArrowRight') {
-        translateBy(cursor, +xStep, 0);
-        createOrUpdateSelectionRect(cursor.getParent(), cursor.position());
-        cursor.getLayer().draw();
+        $K(cursor).translateBy(+cellWidth, 0);
+        selectionPreview.update(cursor.getParent(), cursor.position());
+        $K(cursor).draw();
       }
       else if (ev.code === 'ArrowUp') {
-        translateBy(cursor, 0, -yStep);
-        createOrUpdateSelectionRect(cursor.getParent(), cursor.position());
-        cursor.getLayer().draw();
+        $K(cursor).translateBy(0, -cellHeight);
+        selectionPreview.update(cursor.getParent(), cursor.position());
+        $K(cursor).draw();
       }
       else if (ev.code === 'ArrowDown') {
-        translateBy(cursor, 0, +yStep);
-        createOrUpdateSelectionRect(cursor.getParent(), cursor.position());
-        cursor.getLayer().draw();
+        $K(cursor).translateBy(0, +cellHeight);
+        selectionPreview.update(cursor.getParent(), cursor.position());
+        $K(cursor).draw();
       }
       else if (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight') {
-        createOrUpdateSelectionRect(cursor.getParent(), cursor.position());
+        selectionPreview.update(cursor.getParent(), cursor.position());
       }
     }
     else {
       if (ev.code === 'ArrowLeft') {
-        translateBy(cursor, -xStep, 0);
-        cursor.getLayer().draw();
+        $K(cursor)
+          .translateBy(-cellWidth, 0)
+          .draw();
       }
       else if (ev.code === 'ArrowRight') {
-        translateBy(cursor, +xStep, 0);
-        cursor.getLayer().draw();
+        $K(cursor)
+          .translateBy(+cellWidth, 0)
+          .draw();
       }
       else if (ev.code === 'ArrowUp') {
-        translateBy(cursor, 0, -yStep);
-        cursor.getLayer().draw();
+        $K(cursor)
+          .translateBy(0, -cellHeight)
+          .draw();
       }
       else if (ev.code === 'ArrowDown') {
-        translateBy(cursor, 0, +yStep);
-        cursor.getLayer().draw();
+        $K(cursor)
+          .translateBy(0, +cellHeight)
+          .draw();
       }
       else if (ev.code === 'KeyA') {
-        incrementGridResolution(grid, -1, 0);
+        $K(grid)
+          .do([incrementGridResolution, -1, 0]);
       }
       else if (ev.code === 'KeyD') {
-        incrementGridResolution(grid, +1, 0);
+        $K(grid)
+          .do([incrementGridResolution, +1, 0]);
       }
       else if (ev.code === 'KeyW') {
-        incrementGridResolution(grid, 0, -1);
+        $K(grid)
+          .do([incrementGridResolution, 0, -1]);
       }
       else if (ev.code === 'KeyS') {
-        incrementGridResolution(grid, 0, +1);
-      }
-      else if (ev.code === 'Space') {
-        let foregroundGroup = stage.findOne('#foreground');
-        pastePosition(foregroundGroup, cursor.position());
-      }
-      else if (ev.code === 'Backspace') {
-        let foregroundGroup = stage.findOne('#foreground');
-        let bounds = {...cursor.position(), width: xStep, height: yStep};
-        let eraseChildren = queryBounds(foregroundGroup, bounds);
-        if (eraseChildren.length > 0) {
-          C('Erase', {elements: eraseChildren, parent: foregroundGroup});
-        }
+        $K(grid)
+          .do([incrementGridResolution, 0, +1]);
       }
       else {
         return;
@@ -535,11 +545,56 @@ let addKeyboardEvents = (stage) => {
     }
 
     if (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight') {
-      removeSelectionRect();
-      cursor.getLayer().draw();
+      if (selectionPreview.isValid()) {
+        let foregroundGroup = stage.findOne('#foreground');
+        let rect = selectionPreview.get();
+        copyBounds(foregroundGroup, {...rect.size(), ...rect.position()});
+        selectionPreview.destroy();
+        cursor.getLayer().draw();
+      }
     }
     else {
       return;
+    }
+
+    ev.preventDefault();
+  });
+
+  stage.container().addEventListener('keydown', (ev) => {
+    let cursor = stage.findOne('#cursor');
+    let foregroundGroup = stage.findOne('#foreground');
+
+    if (ev.ctrlKey) {
+      if (ev.code === 'KeyC') {
+        let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
+        if (grid) {
+          copyBounds(foregroundGroup, {...cursor.position(), ...getCellSize(grid)});
+        }
+      }
+      else if (ev.code === 'KeyV') {
+        pastePosition(foregroundGroup, cursor.position());
+      }
+      else {
+        return;
+      }
+    }
+    else {
+      if (ev.code === 'Space') {
+        pastePosition(foregroundGroup, cursor.position());
+      }
+      else if (ev.code === 'Backspace') {
+        let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
+        if (grid) {
+          let bounds = {...cursor.position(), ...getCellSize(grid)};
+          let eraseChildren = queryBounds(foregroundGroup, bounds);
+          if (eraseChildren.length > 0) {
+            C('Erase', {elements: eraseChildren, parent: foregroundGroup});
+          }
+        }
+      }
+      else {
+        return;
+      }
     }
 
     ev.preventDefault();
@@ -651,7 +706,13 @@ let disableRightClick = (stage) => {
   });
 };
 
-function MakeApp(container, {width, height}) {
+let App = {
+  clipboard: [],
+  shiftMod: false,
+  ctrlMod: false
+};
+
+function AttachApp(container, {width, height}) {
   K('Stage', {container: container, width: width, height: height},
     K('Layer', {},
       K('Group', {width: width, height: height}, '#background',
@@ -676,10 +737,26 @@ function MakeApp(container, {width, height}) {
   )
 }
 
+//-----------------------------------------------------------------------------
+
+function attr(el, attrs = {}) {
+  for (let name in attrs) {
+    el.setAttribute(name, attrs[name]);
+  }
+}
+
+function style(el, styles = {}) {
+  for (let name in styles) {
+    el.style[name] = styles[name];
+  }
+}
+
+let $H = Selector({attr, style});
+
 H(document.body, {},
   H('div', {},
-    [el => el.setAttribute('tabindex', 0)],
-    [el => el.style.outline = 'none'],
-    [MakeApp, {width: 800, height: 600}]
+    [attr, {'tabindex': 0}],
+    [style, {'outline': 'none'}],
+    [AttachApp, {width: 800, height: 600}]
   )
 );
