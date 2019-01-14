@@ -1,3 +1,4 @@
+import Mousetrap from 'mousetrap';
 import H from './html_builder';
 import K from './konva_builder';
 import {Command, Commander} from './commander';
@@ -437,200 +438,231 @@ let addGridEvents = (group, cursor) => {
 
 let addKeyboardEvents = (stage) => {
   let selectionPreview = RectPreview(() => K('Rect', {stroke: 'blue', strokeWidth: 2}));
+  let mousetrap = new Mousetrap(stage.container());
 
-  stage.container().addEventListener('keydown', (ev) => {
+  mousetrap.bind(['left', 'right', 'up', 'down'], (ev, combo) => {
     let cursor = stage.findOne('#cursor');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
     }
-
     let {width: cellWidth, height: cellHeight} = getCellSize(grid);
 
-    if (ev.shiftKey) {
-      if (ev.code === 'KeyA') {
-        $K(grid)
-          .resizeBy(-cellWidth, 0)
-          .do([incrementGridResolution, -1, 0]);
-      }
-      else if (ev.code === 'KeyD') {
-        $K(grid)
-          .resizeBy(+cellWidth, 0)
-          .do([incrementGridResolution, +1, 0]);
-      }
-      else if (ev.code === 'KeyW') {
-        $K(grid)
-          .resizeBy(0, -cellHeight)
-          .do([incrementGridResolution, 0, -1]);
-      }
-      else if (ev.code === 'KeyS') {
-        $K(grid)
-          .resizeBy(0, +cellHeight)
-          .do([incrementGridResolution, 0, +1]);
-      }
-      else if (ev.code === 'ArrowLeft') {
-        $K(cursor).translateBy(-cellWidth, 0);
-        selectionPreview.update(cursor.getParent(), cursor.position());
-        $K(cursor).draw();
-      }
-      else if (ev.code === 'ArrowRight') {
-        $K(cursor).translateBy(+cellWidth, 0);
-        selectionPreview.update(cursor.getParent(), cursor.position());
-        $K(cursor).draw();
-      }
-      else if (ev.code === 'ArrowUp') {
-        $K(cursor).translateBy(0, -cellHeight);
-        selectionPreview.update(cursor.getParent(), cursor.position());
-        $K(cursor).draw();
-      }
-      else if (ev.code === 'ArrowDown') {
-        $K(cursor).translateBy(0, +cellHeight);
-        selectionPreview.update(cursor.getParent(), cursor.position());
-        $K(cursor).draw();
-      }
-      else if (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight') {
-        selectionPreview.update(cursor.getParent(), cursor.position());
-      }
+    if (combo === 'left') {
+      $K(cursor)
+        .translateBy(-cellWidth, 0)
+        .draw();
     }
-    else {
-      if (ev.code === 'ArrowLeft') {
-        $K(cursor)
-          .translateBy(-cellWidth, 0)
-          .draw();
-      }
-      else if (ev.code === 'ArrowRight') {
-        $K(cursor)
-          .translateBy(+cellWidth, 0)
-          .draw();
-      }
-      else if (ev.code === 'ArrowUp') {
-        $K(cursor)
-          .translateBy(0, -cellHeight)
-          .draw();
-      }
-      else if (ev.code === 'ArrowDown') {
-        $K(cursor)
-          .translateBy(0, +cellHeight)
-          .draw();
-      }
-      else if (ev.code === 'KeyA') {
-        $K(grid)
-          .do([incrementGridResolution, -1, 0]);
-      }
-      else if (ev.code === 'KeyD') {
-        $K(grid)
-          .do([incrementGridResolution, +1, 0]);
-      }
-      else if (ev.code === 'KeyW') {
-        $K(grid)
-          .do([incrementGridResolution, 0, -1]);
-      }
-      else if (ev.code === 'KeyS') {
-        $K(grid)
-          .do([incrementGridResolution, 0, +1]);
-      }
-      else {
-        return;
-      }
+    else if (combo === 'right') {
+      $K(cursor)
+        .translateBy(+cellWidth, 0)
+        .draw();
+    }
+    else if (combo === 'up') {
+      $K(cursor)
+        .translateBy(0, -cellHeight)
+        .draw();
+    }
+    else if (combo === 'down') {
+      $K(cursor)
+        .translateBy(0, +cellHeight)
+        .draw();
     }
 
-    ev.preventDefault();
+    return false;
   });
 
-  stage.container().addEventListener('keyup', (ev) => {
+  mousetrap.bind(['a', 'd', 'w', 's'], (ev, combo) => {
     let cursor = stage.findOne('#cursor');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
     }
 
-    if (ev.code === 'ShiftLeft' || ev.code === 'ShiftRight') {
-      if (selectionPreview.isValid()) {
-        let foregroundGroup = stage.findOne('#foreground');
-        let rect = selectionPreview.get();
-        copyBounds(foregroundGroup, {...rect.size(), ...rect.position()});
-        selectionPreview.destroy();
-        cursor.getLayer().draw();
-      }
+    if (combo === 'a') {
+      $K(grid)
+        .do([incrementGridResolution, -1, 0]);
     }
-    else {
+    else if (combo === 'd') {
+      $K(grid)
+        .do([incrementGridResolution, +1, 0]);
+    }
+    else if (combo === 'w') {
+      $K(grid)
+        .do([incrementGridResolution, 0, -1]);
+    }
+    else if (combo === 's') {
+      $K(grid)
+        .do([incrementGridResolution, 0, +1]);
+    }
+
+    return false;
+  })
+
+  mousetrap.bind(['shift+a', 'shift+d', 'shift+w', 'shift+s'], (ev, combo) => {
+    let cursor = stage.findOne('#cursor');
+    let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
+    if (!grid) {
+      return;
+    }
+    let {width: cellWidth, height: cellHeight} = getCellSize(grid);
+
+    if (combo === 'shift+a') {
+      $K(grid)
+        .resizeBy(-cellWidth, 0)
+        .do([incrementGridResolution, -1, 0]);
+    }
+    else if (combo === 'shift+d') {
+      $K(grid)
+        .resizeBy(+cellWidth, 0)
+        .do([incrementGridResolution, +1, 0]);
+    }
+    else if (combo === 'shift+w') {
+      $K(grid)
+        .resizeBy(0, -cellHeight)
+        .do([incrementGridResolution, 0, -1]);
+    }
+    else if (combo === 'shift+s') {
+      $K(grid)
+        .resizeBy(0, +cellHeight)
+        .do([incrementGridResolution, 0, +1]);
+    }
+
+    return false;
+  });
+
+  mousetrap.bind(['shift+left', 'shift+right', 'shift+up', 'shift+down'], (ev, combo) => {
+    let cursor = stage.findOne('#cursor');
+    let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
+    if (!grid) {
+      return;
+    }
+    let {width: cellWidth, height: cellHeight} = getCellSize(grid);
+
+    if (combo === 'shift+left') {
+      $K(cursor).translateBy(-cellWidth, 0);
+      selectionPreview.update(cursor.getParent(), cursor.position());
+      $K(cursor).draw();
+    }
+    else if (combo === 'shift+right') {
+      $K(cursor).translateBy(+cellWidth, 0);
+      selectionPreview.update(cursor.getParent(), cursor.position());
+      $K(cursor).draw();
+    }
+    else if (combo === 'shift+up') {
+      $K(cursor).translateBy(0, -cellHeight);
+      selectionPreview.update(cursor.getParent(), cursor.position());
+      $K(cursor).draw();
+    }
+    else if (combo === 'shift+down') {
+      $K(cursor).translateBy(0, +cellHeight);
+      selectionPreview.update(cursor.getParent(), cursor.position());
+      $K(cursor).draw();
+    }
+
+    return false;
+  });
+
+  mousetrap.bind('shift', (ev) => {
+    let cursor = stage.findOne('#cursor');
+    selectionPreview.update(cursor.getParent(), cursor.position());
+  }, 'keydown');
+
+  mousetrap.bind('shift', (ev) => {
+    let cursor = stage.findOne('#cursor');
+    let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
+    if (!grid) {
       return;
     }
 
-    ev.preventDefault();
+    if (selectionPreview.isValid()) {
+      let foregroundGroup = stage.findOne('#foreground');
+      let rect = selectionPreview.get();
+      copyBounds(foregroundGroup, {...rect.size(), ...rect.position()});
+      selectionPreview.destroy();
+      cursor.getLayer().draw();
+    }
+
+    return false;
+  }, 'keyup');
+
+  mousetrap.bind('ctrl+c', (ev) => {
+    let cursor = stage.findOne('#cursor');
+    let foregroundGroup = stage.findOne('#foreground');
+    let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
+    if (!grid) {
+      return;
+    }
+
+    copyBounds(foregroundGroup, {...cursor.position(), ...getCellSize(grid)});
+
+    return false;
   });
 
-  stage.container().addEventListener('keydown', (ev) => {
+  mousetrap.bind('ctrl+v', (ev) => {
     let cursor = stage.findOne('#cursor');
     let foregroundGroup = stage.findOne('#foreground');
 
-    if (ev.ctrlKey) {
-      if (ev.code === 'KeyC') {
-        let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
-        if (grid) {
-          copyBounds(foregroundGroup, {...cursor.position(), ...getCellSize(grid)});
-        }
-      }
-      else if (ev.code === 'KeyV') {
-        pastePosition(foregroundGroup, cursor.position());
-      }
-      else {
-        return;
-      }
-    }
-    else {
-      if (ev.code === 'Space') {
-        pastePosition(foregroundGroup, cursor.position());
-      }
-      else if (ev.code === 'Backspace') {
-        let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
-        if (grid) {
-          let bounds = {...cursor.position(), ...getCellSize(grid)};
-          let eraseChildren = queryBounds(foregroundGroup, bounds);
-          if (eraseChildren.length > 0) {
-            C('Erase', {elements: eraseChildren, parent: foregroundGroup});
-          }
-        }
-      }
-      else {
-        return;
-      }
-    }
+    pastePosition(foregroundGroup, cursor.position());
 
-    ev.preventDefault();
-  })
+    return false;
+  });
 
-  stage.container().addEventListener('keydown', (ev) => {
-    if (ev.code === 'KeyZ' && ev.ctrlKey) {
-      C('Undo');
-    }
-    else if (ev.code === 'KeyY' && ev.ctrlKey) {
-      C('Redo');
-    }
-    else {
+  mousetrap.bind('space', (ev) => {
+    let cursor = stage.findOne('#cursor');
+    let foregroundGroup = stage.findOne('#foreground');
+    let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
+    if (!grid) {
       return;
     }
 
-    ev.preventDefault();
+    pastePosition(foregroundGroup, cursor.position());
+
+    return false;
   });
 
-  stage.container().addEventListener('keydown', (ev) => {
-    if (ev.shiftKey) {
-      App.shiftMod = true;
+  mousetrap.bind('backspace', (ev) => {
+    let cursor = stage.findOne('#cursor');
+    let foregroundGroup = stage.findOne('#foreground');
+    let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
+    if (!grid) {
+      return;
     }
-    if (ev.ctrlKey) {
-      App.ctrlMod = true;
+
+    let bounds = {...cursor.position(), ...getCellSize(grid)};
+    let eraseChildren = queryBounds(foregroundGroup, bounds);
+    if (eraseChildren.length > 0) {
+      C('Erase', {elements: eraseChildren, parent: foregroundGroup});
     }
+
+    return false;
   });
 
-  stage.container().addEventListener('keyup', (ev) => {
-    if (!ev.shiftKey) {
-      App.shiftMod = false;
-    }
-    if (!ev.ctrlKey) {
-      App.ctrlMod = false;
-    }
+  mousetrap.bind('ctrl+z', (ev) => {
+    C('Undo');
+    return false;
   });
+
+  mousetrap.bind('ctrl+y', (ev) => {
+    C('Redo');
+    return false;
+  });
+
+  mousetrap.bind('shift', (ev) => {
+    App.shiftMod = true;
+  }, 'keydown');
+
+  mousetrap.bind('shift', (ev) => {
+    App.shiftMod = false;
+  }, 'keyup');
+
+  mousetrap.bind('ctrl', (ev) => {
+    App.ctrlMod = true;
+  }, 'keydown');
+
+  mousetrap.bind('ctrl', (ev) => {
+    App.ctrlMod = false;
+  }, 'keyup');
 };
 
 let addDragDropEvents = (stage) => {
