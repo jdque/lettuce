@@ -1,7 +1,9 @@
 import Mousetrap from 'mousetrap';
+import {observable, autorun} from 'mobx';
 import H from './html_builder';
 import K from './konva_builder';
 import {Command, Commander} from './commander';
+import {Reflector} from './reflector';
 import {Selector} from './selector';
 import {FSM} from '../lib/royal';
 
@@ -133,76 +135,102 @@ function pastePosition(container, position) {
   }
 }
 
-function RectPreview(buildRectFunc) {
-  let rect = null;
-  let startX = null;
-  let startY = null;
+function RectPreview(buildFunc) {
+  let preview = Reflector({
+    container: null,
+    point: null
+  });
+
+  let binding = preview.reflect((props, state) => {
+    let {container, point} = props;
+
+    if (state.rect == null) {
+      state.rect = buildFunc();
+      state.rect.setAttrs({
+        x: point.x,
+        y: point.y
+      });
+      state.startPoint = {
+        x: point.x,
+        y: point.y
+      };
+      container.add(state.rect);
+    }
+
+    if (container == null) {
+      state.rect.destroy();
+      state.rect = null;
+      return;
+    }
+
+    state.rect.setAttrs({
+      x: Math.min(point.x, state.startPoint.x),
+      y: Math.min(point.y, state.startPoint.y),
+      width: Math.abs(point.x - state.startPoint.x),
+      height: Math.abs(point.y - state.startPoint.y)
+    });
+  });
 
   return {
-    update: (container, pt) => {
-      if (rect == null) {
-        rect = buildRectFunc();
-        rect.setAttrs({
-          x: pt.x,
-          y: pt.y
-        });
-        startX = pt.x;
-        startY = pt.y;
-        container.add(rect);
-      }
-      rect.setAttrs({
-        x: Math.min(pt.x, startX),
-        y: Math.min(pt.y, startY),
-        width: Math.abs(pt.x - startX),
-        height: Math.abs(pt.y - startY)
-      });
+    update: (container, point) => {
+      preview.update({container, point});
     },
     destroy: () => {
-      if (rect != null) {
-        rect.destroy();
-        rect = null;
-      }
+      preview.update({container: null});
     },
     get: () => {
-      return rect;
+      return binding.state('rect');
     },
     isValid: () => {
-      return rect != null;
+      return binding.state('rect') != null;
     }
   };
 }
 
 function LinePreview(buildLineFunc) {
-  let line = null;
-  let startX = null;
-  let startY = null;
+  let preview = Reflector({
+    container: null,
+    point: null
+  });
+
+  let binding = preview.reflect((props, state) => {
+    let {container, point} = props;
+
+    if (state.line == null) {
+      state.line = buildLineFunc();
+      state.line.setAttrs({
+        points: [point.x, point.y, point.x, point.y]
+      });
+      state.startPoint = {
+        x: point.x,
+        y: point.y
+      };
+      container.add(state.line);
+    }
+
+    if (container == null) {
+      state.line.destroy();
+      state.line = null;
+      return;
+    }
+
+    state.line.setAttrs({
+      points: [state.startPoint.x, state.startPoint.y, point.x, point.y]
+    });
+  });
 
   return {
-    update: (container, pt) => {
-      if (line == null) {
-        line = buildLineFunc();
-        line.setAttrs({
-          points: [pt.x, pt.y, pt.x, pt.y]
-        });
-        startX = pt.x;
-        startY = pt.y;
-        container.add(line);
-      }
-      line.setAttrs({
-        points: [startX, startY, pt.x, pt.y]
-      });
+    update: (container, point) => {
+      preview.update({container, point});
     },
     destroy: () => {
-      if (line != null) {
-        line.destroy();
-        line = null;
-      }
+      preview.update({container: null})
     },
     get: () => {
-      return line;
+      return binding.state('line');
     },
     isValid: () => {
-      return line != null;
+      return binding.state('line') != null;
     }
   };
 }
@@ -306,7 +334,7 @@ function Drawable(container, cursor) {
   });
 
   $mouse.when('drag_select', ($self) => {
-    let selectionPreview = RectPreview(() => K('Rect', {stroke: 'blue', strokeWidth: 2}));
+    let selectionPreview = RectPreview(() => K('Rect', {stroke: 'black', strokeWidth: 1, fill: 'blue', opacity: 0.6}));
 
     let onMouseMove = (ev) => {
       let containerPos = container.getAbsolutePosition();
@@ -437,7 +465,7 @@ let addGridEvents = (group, cursor) => {
 };
 
 let addKeyboardEvents = (stage) => {
-  let selectionPreview = RectPreview(() => K('Rect', {stroke: 'blue', strokeWidth: 2}));
+  let selectionPreview = RectPreview(() => K('Rect', {stroke: 'black', strokeWidth: 1, fill: 'blue', opacity: 0.6}));
   let mousetrap = new Mousetrap(stage.container());
 
   mousetrap.bind(['left', 'right', 'up', 'down'], (ev, combo) => {
@@ -533,58 +561,41 @@ let addKeyboardEvents = (stage) => {
 
   mousetrap.bind(['shift+left', 'shift+right', 'shift+up', 'shift+down'], (ev, combo) => {
     let cursor = stage.findOne('#cursor');
+    let overlayGroup = stage.findOne('#overlay');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
     }
+
+    if (!selectionPreview.isValid()) {
+      selectionPreview.update(overlayGroup, cursor.position());
+    }
+
     let {width: cellWidth, height: cellHeight} = getCellSize(grid);
 
     if (combo === 'shift+left') {
       $K(cursor).translateBy(-cellWidth, 0);
-      selectionPreview.update(cursor.getParent(), cursor.position());
-      $K(cursor).draw();
+      selectionPreview.update(overlayGroup, cursor.position());
+      $K(overlayGroup).draw();
     }
     else if (combo === 'shift+right') {
       $K(cursor).translateBy(+cellWidth, 0);
-      selectionPreview.update(cursor.getParent(), cursor.position());
-      $K(cursor).draw();
+      selectionPreview.update(overlayGroup, cursor.position());
+      $K(overlayGroup).draw();
     }
     else if (combo === 'shift+up') {
       $K(cursor).translateBy(0, -cellHeight);
-      selectionPreview.update(cursor.getParent(), cursor.position());
-      $K(cursor).draw();
+      selectionPreview.update(overlayGroup, cursor.position());
+      $K(overlayGroup).draw();
     }
     else if (combo === 'shift+down') {
       $K(cursor).translateBy(0, +cellHeight);
-      selectionPreview.update(cursor.getParent(), cursor.position());
-      $K(cursor).draw();
+      selectionPreview.update(overlayGroup, cursor.position());
+      $K(overlayGroup).draw();
     }
 
     return false;
   });
-
-  mousetrap.bind('shift', (ev) => {
-    let cursor = stage.findOne('#cursor');
-    selectionPreview.update(cursor.getParent(), cursor.position());
-  }, 'keydown');
-
-  mousetrap.bind('shift', (ev) => {
-    let cursor = stage.findOne('#cursor');
-    let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
-    if (!grid) {
-      return;
-    }
-
-    if (selectionPreview.isValid()) {
-      let foregroundGroup = stage.findOne('#foreground');
-      let rect = selectionPreview.get();
-      copyBounds(foregroundGroup, {...rect.size(), ...rect.position()});
-      selectionPreview.destroy();
-      cursor.getLayer().draw();
-    }
-
-    return false;
-  }, 'keyup');
 
   mousetrap.bind('ctrl+c', (ev) => {
     let cursor = stage.findOne('#cursor');
@@ -594,7 +605,13 @@ let addKeyboardEvents = (stage) => {
       return;
     }
 
-    copyBounds(foregroundGroup, {...cursor.position(), ...getCellSize(grid)});
+    if (selectionPreview.isValid()) {
+      let rect = selectionPreview.get();
+      copyBounds(foregroundGroup, {...rect.position(), ...rect.size()});
+    }
+    else {
+      copyBounds(foregroundGroup, {...cursor.position(), ...getCellSize(grid)});
+    }
 
     return false;
   });
@@ -646,6 +663,23 @@ let addKeyboardEvents = (stage) => {
   mousetrap.bind('ctrl+y', (ev) => {
     C('Redo');
     return false;
+  });
+
+  mousetrap.bind('escape', (ev) => {
+    let cursor = stage.findOne('#cursor');
+    let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
+    if (!grid) {
+      return;
+    }
+
+    if (selectionPreview.isValid()) {
+      let overlayGroup = stage.findOne('#overlay');
+      let foregroundGroup = stage.findOne('#foreground');
+      let rect = selectionPreview.get();
+      copyBounds(foregroundGroup, {...rect.size(), ...rect.position()});
+      selectionPreview.destroy();
+      overlayGroup.getLayer().draw();
+    }
   });
 
   mousetrap.bind('shift', (ev) => {
