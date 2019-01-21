@@ -1,5 +1,15 @@
 function Accessor(binding) {
   let accessor = {
+    props: (key) => {
+      if (key) {
+        return binding.props[key];
+      }
+      let snapshot = {};
+      for (let key in binding.props) {
+        snapshot[key] = binding.props[key];
+      }
+      return snapshot;
+    },
     state: (key) => {
       if (key) {
         return binding.state[key];
@@ -18,14 +28,27 @@ export function Reflector(props) {
   let bindings = [];
 
   let reflector = {
-    reflect: (func) => {
+    props: (key) => {
+      if (key) {
+        return props[key];
+      }
+      let snapshot = {};
+      for (let key in props) {
+        snapshot[key] = props[key];
+      }
+      return snapshot;
+    },
+    reflect: (func, quiet = false) => {
       let binding = {
         func: func,
         props: props,
         state: {}
       };
-
       bindings.push(binding);
+
+      if (!quiet) {
+        binding.func(props, binding.state);
+      }
 
       return Accessor(binding);
     },

@@ -1,5 +1,5 @@
 export default function (tag, props = {}, ...children) {
-	let elem = null;
+  let elem = null;
   if (tag instanceof Element) {
     elem = tag;
   }

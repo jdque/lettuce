@@ -1,5 +1,4 @@
 import Mousetrap from 'mousetrap';
-import {observable, autorun} from 'mobx';
 import H from './html_builder';
 import K from './konva_builder';
 import {Command, Commander} from './commander';
@@ -47,10 +46,33 @@ let EraseCommand = Command({
   }
 });
 
-let C = Commander({
-  'Draw': DrawCommand,
-  'Erase': EraseCommand
-});
+let App = {
+  C: Commander({
+    'Draw': DrawCommand,
+    'Erase': EraseCommand
+  }),
+  clipboard: [],
+  pages:[
+    {
+      name: 'Hello',
+      elem: null
+    },
+    {
+      name: 'World',
+      elem: null
+    },
+    {
+      name: 'Again',
+      elem: null
+    },
+    {
+      name: 'Another',
+      elem: null
+    }
+  ],
+  shiftMod: false,
+  ctrlMod: false
+};
 
 function queryBounds(container, bounds) {
   let resultChildren = [];
@@ -131,7 +153,7 @@ function pastePosition(container, position) {
   }
 
   if (clones.length > 0) {
-    C('Draw', {elements: clones, parent: container});
+    App.C('Draw', {elements: clones, parent: container});
   }
 }
 
@@ -143,6 +165,9 @@ function RectPreview(buildFunc) {
 
   let binding = preview.reflect((props, state) => {
     let {container, point} = props;
+    if (container == null && point == null) {
+      return;
+    }
 
     if (state.rect == null) {
       state.rect = buildFunc();
@@ -195,6 +220,9 @@ function LinePreview(buildLineFunc) {
 
   let binding = preview.reflect((props, state) => {
     let {container, point} = props;
+    if (container == null && point == null) {
+      return;
+    }
 
     if (state.line == null) {
       state.line = buildLineFunc();
@@ -308,11 +336,11 @@ function Drawable(container, cursor) {
 
     let onMouseUp = (ev) => {
       if (linePreview.isValid()) {
-        let foregroundGroup = container.getStage().findOne('#foreground');
+        let foregroundGroup = container.getStage().findOne('.id-foreground');
         let line = linePreview.get();
         let [startX, startY, endX, endY] = line.getAttr('points');
         if (startX !== endX || startY !== endY) {
-          C('Draw', {
+          App.C('Draw', {
             elements: [K('Line', {...line.getAttrs()})],
             parent: foregroundGroup
           });
@@ -345,7 +373,7 @@ function Drawable(container, cursor) {
 
     let onMouseUp = (ev) => {
       if (selectionPreview.isValid()) {
-        let foregroundGroup = container.getStage().findOne('#foreground');
+        let foregroundGroup = container.getStage().findOne('.id-foreground');
         let rect = selectionPreview.get();
         copyBounds(foregroundGroup, {...rect.size(), ...rect.position()});
         selectionPreview.destroy();
@@ -429,7 +457,6 @@ let addGridEvents = (group, cursor) => {
     if (grid) {
       let delta = ev.evt.deltaY > 0 ? -1 : 1;
       incrementGridResolution(grid, delta, delta);
-      grid.getLayer().draw();
       ev.evt.preventDefault();
     }
   });
@@ -438,9 +465,9 @@ let addGridEvents = (group, cursor) => {
     if (ev.evt.which === 3) {
       let cursorPos = cursor.getAbsolutePosition();
       let newGrid = K(GridContainer, {resolutionX: 2, resolutionY: 2, x: cursorPos.x, y: cursorPos.y, width: 128, height: 128});
-      let backgroundGroup = group.getStage().findOne('#background');
+      let backgroundGroup = group.getStage().findOne('.id-background');
 
-      C('Draw', {elements: [newGrid], parent: backgroundGroup});
+      App.C('Draw', {elements: [newGrid], parent: backgroundGroup});
     }
   });
 
@@ -469,7 +496,7 @@ let addKeyboardEvents = (stage) => {
   let mousetrap = new Mousetrap(stage.container());
 
   mousetrap.bind(['left', 'right', 'up', 'down'], (ev, combo) => {
-    let cursor = stage.findOne('#cursor');
+    let cursor = stage.findOne('.id-cursor');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
@@ -501,7 +528,7 @@ let addKeyboardEvents = (stage) => {
   });
 
   mousetrap.bind(['a', 'd', 'w', 's'], (ev, combo) => {
-    let cursor = stage.findOne('#cursor');
+    let cursor = stage.findOne('.id-cursor');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
@@ -528,7 +555,7 @@ let addKeyboardEvents = (stage) => {
   })
 
   mousetrap.bind(['shift+a', 'shift+d', 'shift+w', 'shift+s'], (ev, combo) => {
-    let cursor = stage.findOne('#cursor');
+    let cursor = stage.findOne('.id-cursor');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
@@ -560,8 +587,8 @@ let addKeyboardEvents = (stage) => {
   });
 
   mousetrap.bind(['shift+left', 'shift+right', 'shift+up', 'shift+down'], (ev, combo) => {
-    let cursor = stage.findOne('#cursor');
-    let overlayGroup = stage.findOne('#overlay');
+    let cursor = stage.findOne('.id-cursor');
+    let overlayGroup = stage.findOne('.id-overlay');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
@@ -598,8 +625,8 @@ let addKeyboardEvents = (stage) => {
   });
 
   mousetrap.bind('ctrl+c', (ev) => {
-    let cursor = stage.findOne('#cursor');
-    let foregroundGroup = stage.findOne('#foreground');
+    let cursor = stage.findOne('.id-cursor');
+    let foregroundGroup = stage.findOne('.id-foreground');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
@@ -617,8 +644,8 @@ let addKeyboardEvents = (stage) => {
   });
 
   mousetrap.bind('ctrl+v', (ev) => {
-    let cursor = stage.findOne('#cursor');
-    let foregroundGroup = stage.findOne('#foreground');
+    let cursor = stage.findOne('.id-cursor');
+    let foregroundGroup = stage.findOne('.id-foreground');
 
     pastePosition(foregroundGroup, cursor.position());
 
@@ -626,8 +653,8 @@ let addKeyboardEvents = (stage) => {
   });
 
   mousetrap.bind('space', (ev) => {
-    let cursor = stage.findOne('#cursor');
-    let foregroundGroup = stage.findOne('#foreground');
+    let cursor = stage.findOne('.id-cursor');
+    let foregroundGroup = stage.findOne('.id-foreground');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
@@ -639,8 +666,8 @@ let addKeyboardEvents = (stage) => {
   });
 
   mousetrap.bind('backspace', (ev) => {
-    let cursor = stage.findOne('#cursor');
-    let foregroundGroup = stage.findOne('#foreground');
+    let cursor = stage.findOne('.id-cursor');
+    let foregroundGroup = stage.findOne('.id-foreground');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
@@ -649,32 +676,32 @@ let addKeyboardEvents = (stage) => {
     let bounds = {...cursor.position(), ...getCellSize(grid)};
     let eraseChildren = queryBounds(foregroundGroup, bounds);
     if (eraseChildren.length > 0) {
-      C('Erase', {elements: eraseChildren, parent: foregroundGroup});
+      App.C('Erase', {elements: eraseChildren, parent: foregroundGroup});
     }
 
     return false;
   });
 
   mousetrap.bind('ctrl+z', (ev) => {
-    C('Undo');
+    App.C('Undo');
     return false;
   });
 
   mousetrap.bind('ctrl+y', (ev) => {
-    C('Redo');
+    App.C('Redo');
     return false;
   });
 
   mousetrap.bind('escape', (ev) => {
-    let cursor = stage.findOne('#cursor');
+    let cursor = stage.findOne('.id-cursor');
     let grid = stage.getIntersection(cursor.getAbsolutePosition(), '.grid');
     if (!grid) {
       return;
     }
 
     if (selectionPreview.isValid()) {
-      let overlayGroup = stage.findOne('#overlay');
-      let foregroundGroup = stage.findOne('#foreground');
+      let overlayGroup = stage.findOne('.id-overlay');
+      let foregroundGroup = stage.findOne('.id-foreground');
       let rect = selectionPreview.get();
       copyBounds(foregroundGroup, {...rect.size(), ...rect.position()});
       selectionPreview.destroy();
@@ -721,17 +748,17 @@ let addDragDropEvents = (stage) => {
                 scaleX: 2.0,
                 scaleY: 2.0
               });
-              let foregroundGroup = stage.findOne('#foreground');
+              let foregroundGroup = stage.findOne('.id-foreground');
               foregroundGroup.add(regionImage);
               foregroundGroup.getLayer().draw();
 
               let grid = K(GridContainer, {resolutionX: 16, resolutionY: 16, x: 500, y: 10, width: imageWidth * 2, height: imageHeight * 2});
-              let backgroundGroup = stage.findOne('#background');
+              let backgroundGroup = stage.findOne('.id-background');
               backgroundGroup.add(grid);
               backgroundGroup.getLayer().draw();
 
-              stage.findOne('#overlay').on('click', (ev) => {
-                let cursor = stage.findOne('#cursor');
+              stage.findOne('.id-overlay').on('click', (ev) => {
+                let cursor = stage.findOne('.id-cursor');
                 if (!stage.getIntersection(cursor.getAbsolutePosition(), '.grid')) {
                   return;
                 }
@@ -772,27 +799,21 @@ let disableRightClick = (stage) => {
   });
 };
 
-let App = {
-  clipboard: [],
-  shiftMod: false,
-  ctrlMod: false
-};
-
-function AttachApp(container, {width, height}) {
+function AttachStage(container, {width, height}) {
   K('Stage', {container: container, width: width, height: height},
     K('Layer', {},
-      K('Group', {width: width, height: height}, '#background',
+      K('Group', {width: width, height: height}, '.id-background',
         K(GridContainer, {resolutionX: 16, resolutionY: 16, x: 10, y: 10, width: 256, height: 256}),
         [Borders, {stroke: 'red', strokeWidth: 1}]
       )
     ),
     K('Layer', {},
-      K('Group', {width: width, height: height}, '#foreground')
+      K('Group', {width: width, height: height}, '.id-foreground')
     ),
     K('Layer', {},
-      K('Group', {width: width, height: height}, '#overlay',
+      K('Group', {width: width, height: height}, '.id-overlay',
         K('Rect', {width: width, height: height}),
-        K('Circle', {radius: 6, stroke: 'black', strokeWidth: 1, x: 0, y: 0, listening: false}, '#cursor', /cursor/),
+        K('Circle', {radius: 6, stroke: 'black', strokeWidth: 1, x: 0, y: 0, listening: false}, '.id-cursor', /cursor/),
         [Drawable, /cursor/],
         [addGridEvents, /cursor/]
       )
@@ -817,12 +838,126 @@ function style(el, styles = {}) {
   }
 }
 
-let $H = Selector({attr, style});
+function on(el, handlers = {}) {
+  for (let name in handlers) {
+    el.addEventListener(name, handlers[name]);
+  }
+}
 
-H(document.body, {},
-  H('div', {},
-    [attr, {'tabindex': 0}],
-    [style, {'outline': 'none'}],
-    [AttachApp, {width: 800, height: 600}]
-  )
-);
+function children(el, children = [], replace = false) {
+  if (replace) {
+    while (el.firstChild) {
+      el.removeChild(el.firstChild);
+    }
+  }
+  for (let child of children) {
+    el.appendChild(child);
+  }
+}
+
+function focus(el) {
+  el.focus();
+}
+
+function reflectAction(el, reflector, action) {
+  reflector.reflect((props) => {
+    let [func, ...args] = action;
+    let resolvedArgs = args.map((arg) => {
+      return arg instanceof RegExp ? props[arg.source] : arg;
+    });
+    H(el, {}, [func, ...resolvedArgs]);
+  });
+}
+
+function StageContainer({width, height}) {
+  return H('div', {},
+    [attr, {tabindex: 0}],
+    [style, {outline: 'none', cursor: 'none'}],
+    [AttachStage, {width: props.width, height: props.height}]
+  );
+}
+
+function PageTabBar({appState, onPageSelect}) {
+  function PageTab(props) {
+    return H('div', {textContent: props.page.name},
+      [style, {
+        display: 'inline-block',
+        width: '8em',
+        textAlign: 'center',
+        borderRight : '1px solid black',
+        backgroundColor: '#ffffff',
+        cursor: 'pointer'
+      }]
+    );
+  }
+
+  let renderTabs = (tabBarElem) => {
+    let {pages, selectedPage} = appState.props();
+    let tabElems = pages.map((page) => {
+      let isSelected = page === selectedPage;
+      return H(PageTab, {page: page},
+        [on, {click: (ev) => onPageSelect(page)}],
+        [style, {backgroundColor: isSelected ? '#ffffff' : '#d0d0d0'}]
+      )
+    });
+
+    H(tabBarElem, {},
+      [children, tabElems, true]
+    );
+  }
+
+  return H('div', {},
+    [reflectAction, appState, [renderTabs]]
+  );
+}
+
+function PageViewer({appState}) {
+  function renderPage(viewerElem) {
+    let {selectedPage} = appState.props();
+    let pageElem = selectedPage.elem;
+
+    H(viewerElem, {},
+      [children, [pageElem], true]
+    );
+    H(pageElem, {},
+      [focus]
+    );
+  };
+
+  return H('div', {},
+    [reflectAction, appState, [renderPage]]
+  );
+}
+
+function main() {
+  let appState = Reflector({
+    pages: App.pages,
+    selectedPage: App.pages[0]
+  });
+
+  let selectPage = (page) => {
+    appState.update({selectedPage: page});
+  };
+
+  appState.reflect(({selectedPage}) => {
+    if (selectedPage.elem == null) {
+      selectedPage.elem = H(StageContainer, {width: 800, height: 600});
+    }
+  });
+
+  H(document.body, {},
+    H('div', {},
+      H(PageTabBar, {appState: appState, onPageSelect: selectPage},
+        [style, {paddingTop: '8px'}]
+      ),
+      [style, {backgroundColor: 'grey'}],
+    ),
+    H('div', {},
+      H(PageViewer, {appState: appState}),
+      [style, {padding: '8px'}]
+    ),
+    [style, {margin: 0}]
+  );
+}
+
+main();

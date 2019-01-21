@@ -5,7 +5,8 @@ export default {
   input: 'src/index.js',
   output: {
     file: 'dist/playground.js',
-    format: 'iife'
+    format: 'iife',
+    sourcemap: true
   },
   watch: {
     include: 'src/**'
