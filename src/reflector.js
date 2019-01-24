@@ -1,15 +1,5 @@
 function Accessor(binding) {
   let accessor = {
-    props: (key) => {
-      if (key) {
-        return binding.props[key];
-      }
-      let snapshot = {};
-      for (let key in binding.props) {
-        snapshot[key] = binding.props[key];
-      }
-      return snapshot;
-    },
     state: (key) => {
       if (key) {
         return binding.state[key];

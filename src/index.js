@@ -86,7 +86,8 @@ function queryBounds(container, bounds) {
   for (let child of container.getChildren()) {
     if (child.getClassName() === 'Line') {
       let points = child.getAttr('points');
-      let {x: cx, y: cy, width: cw, height: ch} = {...child.size(), x: Math.min(points[0], points[2]), y: Math.min(points[1], points[3])};
+      let linePos = {x: Math.min(points[0], points[2]), y: Math.min(points[1], points[3])};
+      let {x: cx, y: cy, width: cw, height: ch} = {...linePos, ...child.size()};
       if ((cx > sx + sw || cx + cw < sx || cy > sy + sh || cy + ch < sy)) {
         continue;
       }
@@ -464,7 +465,11 @@ let addGridEvents = (group, cursor) => {
   group.on('click', (ev) => {
     if (ev.evt.which === 3) {
       let cursorPos = cursor.getAbsolutePosition();
-      let newGrid = K(GridContainer, {resolutionX: 2, resolutionY: 2, x: cursorPos.x, y: cursorPos.y, width: 128, height: 128});
+      let newGrid = K(GridContainer, {
+        resolutionX: 2, resolutionY: 2,
+        x: cursorPos.x, y: cursorPos.y,
+        width: 128, height: 128
+      });
       let backgroundGroup = group.getStage().findOne('.id-background');
 
       App.C('Draw', {elements: [newGrid], parent: backgroundGroup});
@@ -475,7 +480,6 @@ let addGridEvents = (group, cursor) => {
     let pos = group.getStage().getPointerPosition();
     let grid = group.getStage().getIntersection(pos, '.grid');
     if (grid) {
-      let snapPos = getSnapPos(grid, pos);
       cursor.setAttrs({
         x: snapPos.x,
         y: snapPos.y
@@ -873,7 +877,7 @@ function StageContainer({width, height}) {
   return H('div', {},
     [attr, {tabindex: 0}],
     [style, {outline: 'none', cursor: 'none'}],
-    [AttachStage, {width: props.width, height: props.height}]
+    [AttachStage, {width: width, height: height}]
   );
 }
 
