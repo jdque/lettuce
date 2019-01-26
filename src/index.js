@@ -2,6 +2,8 @@ import Mousetrap from 'mousetrap';
 import Sortable from 'sortablejs';
 import H from './html_builder';
 import K from './konva_builder';
+import {attr, on, style, focus, children} from './html_actions';
+import {draw, resizeBy, translateBy, queryBounds, disableRightClick} from './konva_actions';
 import {Command, Commander} from './commander';
 import {Reflector} from './reflector';
 import {Selector} from './selector';
@@ -74,63 +76,6 @@ let App = {
   shiftMod: false,
   ctrlMod: false
 };
-
-function queryBounds(container, bounds) {
-  let resultChildren = [];
-
-  let {x: sx, y: sy, width: sw, height: sh} = bounds;
-  sx += 1;
-  sy += 1;
-  sw -= 2;
-  sh -= 2;
-
-  for (let child of container.getChildren()) {
-    if (child.getClassName() === 'Line') {
-      let points = child.getAttr('points');
-      let linePos = {x: Math.min(points[0], points[2]), y: Math.min(points[1], points[3])};
-      let {x: cx, y: cy, width: cw, height: ch} = {...linePos, ...child.size()};
-      if ((cx > sx + sw || cx + cw < sx || cy > sy + sh || cy + ch < sy)) {
-        continue;
-      }
-      resultChildren.push(child);
-    }
-    else {
-      let {x: cx, y: cy, width: cw, height: ch} = {...child.position(), ...child.size()};
-      if ((cx > sx + sw || cx + cw < sx || cy > sy + sh || cy + ch < sy)) {
-        continue;
-      }
-      resultChildren.push(child);
-    }
-  }
-
-  return resultChildren;
-}
-
-function translateBy(element, dx = 0, dy = 0) {
-  if (element.getClassName() === 'Line') {
-    let points = element.getAttr('points');
-    element.setAttrs({
-      points: [points[0] + dx, points[1] + dy, points[2] + dx, points[3] + dy]
-    });
-  }
-  else {
-    element.setAttrs({
-      x: element.x() + dx,
-      y: element.y() + dy
-    });
-  }
-}
-
-function resizeBy(element, dx = 0, dy = 0) {
-  element.setAttrs({
-    width: element.getAttr('width') + dx,
-    height: element.getAttr('height') + dy
-  });
-}
-
-function draw(element) {
-  element.getLayer().draw();
-}
 
 function copyBounds(container, bounds) {
   for (let element of App.clipboard) {
@@ -799,12 +744,6 @@ let addDragDropEvents = (stage) => {
   });
 }
 
-let disableRightClick = (stage) => {
-  stage.on('contentContextmenu', (e) => {
-    e.evt.preventDefault();
-  });
-};
-
 function AttachStage(container, {width, height}) {
   K('Stage', {container: container, width: width, height: height},
     K('Layer', {},
@@ -831,39 +770,6 @@ function AttachStage(container, {width, height}) {
 }
 
 //-----------------------------------------------------------------------------
-
-function attr(el, attrs = {}) {
-  for (let name in attrs) {
-    el.setAttribute(name, attrs[name]);
-  }
-}
-
-function style(el, styles = {}) {
-  for (let name in styles) {
-    el.style[name] = styles[name];
-  }
-}
-
-function on(el, handlers = {}) {
-  for (let name in handlers) {
-    el.addEventListener(name, handlers[name]);
-  }
-}
-
-function children(el, children = [], replace = false) {
-  if (replace) {
-    while (el.firstChild) {
-      el.removeChild(el.firstChild);
-    }
-  }
-  for (let child of children) {
-    el.appendChild(child);
-  }
-}
-
-function focus(el) {
-  el.focus();
-}
 
 function reflectAction(el, reflector, action) {
   reflector.reflect((props) => {
