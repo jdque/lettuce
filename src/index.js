@@ -210,7 +210,7 @@ function LinePreview(buildLineFunc) {
   };
 }
 
-function GridLines(container, numCols, numRows, lineStyle) {
+function gridLines(container, numCols, numRows, lineStyle) {
   let width = container.width();
   let height = container.height();
 
@@ -237,7 +237,7 @@ function GridLines(container, numCols, numRows, lineStyle) {
   }
 }
 
-function Borders(container, borderStyle) {
+function borders(container, borderStyle) {
   let left = 0;
   let top = 0;
   let right = container.width();
@@ -251,7 +251,7 @@ function Borders(container, borderStyle) {
   );
 }
 
-function Drawable(container, cursor) {
+function drawable(container, cursor) {
   let $mouse = FSM.create(['idle', 'drag_line', 'drag_select']);
 
   $mouse.when('idle', ($self) => {
@@ -345,8 +345,8 @@ function Drawable(container, cursor) {
 function GridContainer({resolutionX, resolutionY, ...style}) {
   return K('Group', {resolutionX, resolutionY, ...style}, '.grid',
     K('Rect', {width: style.width, height: style.height}),
-    [GridLines, resolutionX, resolutionY, {stroke: 'black', strokeWidth: 1}],
-    [Borders, {stroke: 'black', strokeWidth: 1}]
+    [gridLines, resolutionX, resolutionY, {stroke: 'black', strokeWidth: 1}],
+    [borders, {stroke: 'black', strokeWidth: 1}]
   );
 }
 
@@ -749,7 +749,7 @@ function AttachStage(container, {width, height}) {
     K('Layer', {},
       K('Group', {width: width, height: height}, '.id-background',
         K(GridContainer, {resolutionX: 16, resolutionY: 16, x: 10, y: 10, width: 256, height: 256}),
-        [Borders, {stroke: 'red', strokeWidth: 1}]
+        [borders, {stroke: 'red', strokeWidth: 1}]
       )
     ),
     K('Layer', {},
@@ -759,7 +759,7 @@ function AttachStage(container, {width, height}) {
       K('Group', {width: width, height: height}, '.id-overlay',
         K('Rect', {width: width, height: height}),
         K('Circle', {radius: 6, stroke: 'black', strokeWidth: 1, x: 0, y: 0, listening: false}, '.id-cursor', /cursor/),
-        [Drawable, /cursor/],
+        [drawable, /cursor/],
         [addGridEvents, /cursor/]
       )
     ),
