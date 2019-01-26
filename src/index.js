@@ -1,13 +1,13 @@
 import Mousetrap from 'mousetrap';
 import Sortable from 'sortablejs';
-import H from './html_builder';
-import K from './konva_builder';
-import {attr, on, style, focus, children} from './html_actions';
-import {draw, resizeBy, translateBy, queryBounds, disableRightClick} from './konva_actions';
-import {Command, Commander} from './commander';
-import {Reflector} from './reflector';
-import {Selector} from './selector';
+import {Command, Commander} from './core/commander';
+import {Reflector} from './core/reflector';
+import {Selector} from './core/selector';
 import {FSM} from '../lib/royal';
+import H from './html/html_builder';
+import {attr, on, style, focus, children} from './html/html_actions';
+import K from './konva/konva_builder';
+import {draw, resizeBy, translateBy, queryBounds, disableRightClick} from './konva/konva_actions';
 
 let DrawCommand = Command({
   commit: ({elements, parent}) => {
