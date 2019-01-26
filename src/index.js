@@ -49,10 +49,29 @@ let EraseCommand = Command({
   }
 });
 
+let ChangePageCommand = Command({
+  commit: ({toPage, appState}) => {
+    let fromPage = appState.props('selectedPage');
+    appState.update({
+      selectedPage: toPage
+    });
+    return {fromPage, appState};
+  },
+  rollback: ({fromPage, appState}) => {
+    appState.update({
+      selectedPage: fromPage
+    });
+  },
+  destroy: ({fromPage, toPage, appState}) => {
+    // NO-OP
+  }
+});
+
 let App = {
   C: Commander({
     'Draw': DrawCommand,
-    'Erase': EraseCommand
+    'Erase': EraseCommand,
+    'ChangePage': ChangePageCommand
   }),
   clipboard: [],
   pages:[
@@ -766,7 +785,7 @@ function AttachStage(container, {width, height}) {
     [disableRightClick],
     [addKeyboardEvents],
     [addDragDropEvents]
-  )
+  );
 }
 
 //-----------------------------------------------------------------------------
@@ -865,7 +884,7 @@ function main() {
   });
 
   let selectPage = (page) => {
-    appState.update({selectedPage: page});
+    App.C('ChangePage', {toPage: page, appState: appState});
   };
 
   appState.reflect(({selectedPage}) => {

@@ -14,7 +14,8 @@ export function Commander(commands) {
 
   let undo = () => {
     if (currentIdx === -1) {
-      throw new Error('Nothing to undo');
+      console.warn('Nothing to undo');
+      return;
     }
     let currentEntry = log[currentIdx];
     currentIdx -= 1;
@@ -23,7 +24,8 @@ export function Commander(commands) {
 
   let redo = () => {
     if (currentIdx === log.length - 1) {
-      throw new Error('Nothing to redo');
+      console.warn('Nothing to redo');
+      return;
     }
     let nextEntry = log[currentIdx + 1];
     currentIdx += 1;
