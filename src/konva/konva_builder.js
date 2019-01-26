@@ -1,6 +1,11 @@
 import Konva from 'konva';
+import {Builder} from '../core/builder';
 
-export default function (tag, props = {}, ...children) {
+function isElement(any) {
+  return any instanceof Konva.Node;
+}
+
+function createElement(tag, props, children) {
   let elem = null;
   if (tag instanceof Konva.Node) {
     elem = tag;
@@ -14,55 +19,43 @@ export default function (tag, props = {}, ...children) {
   else {
     throw new Error('Invalid tag');
   }
-
-  let taggedChildren = {};
-
-  for (let child of children) {
-    if (child instanceof Konva.Node) {
-      elem.add(child);
-
-      let childTag = child.getAttr('__tag__');
-      if (childTag) {
-        taggedChildren[childTag] = child;
-      }
-    }
-    else if (child instanceof Array) {
-      let [func, ...args] = child;
-      for (let i = 0; i < args.length; i++) {
-        if (args[i] instanceof RegExp) {
-          if (args[i].source === 'children') {
-            args[i] = taggedChildren;
-          }
-          else {
-            args[i] = taggedChildren[args[i].source];
-          }
-        }
-      }
-      if (typeof func === 'string') {
-        elem[func](...args);
-      }
-      else if (typeof func === 'function') {
-        func(elem, ...args);
-      }
-    }
-    else if (child instanceof RegExp) {
-      elem.setAttr('__tag__', child.source);
-    }
-    else if (typeof child === 'string') {
-      if (child[0] === '.') {
-        elem.addName(child.slice(1));
-      }
-      else if (child[0] === '#') {
-        elem.setId(child.slice(1));
-      }
-      else {
-        //NO-OP
-      }
-    }
-    else {
-      throw new Error('Invalid child');
-    }
-  }
-
   return elem;
 }
+
+function appendChild(elem, child) {
+  elem.add(child);
+}
+
+function runAction(elem, action) {
+  let [func, ...args] = action;
+  if (typeof func === 'string') {
+    elem[func](...args);
+  }
+  else if (typeof func === 'function') {
+    func(elem, ...args);
+  }
+}
+
+function getMarker(elem) {
+  return elem.getAttr('__marker__');
+}
+
+function setMarker(elem, marker) {
+  elem.setAttr('__marker__', marker);
+}
+
+function setId(elem, id) {
+  elem.setId(id);
+}
+
+function addClass(elem, klass) {
+  elem.addName(klass);
+}
+
+function addText(elem, text) {
+  //NO-OP
+}
+
+export default Builder({
+  isElement, createElement, appendChild, runAction, getMarker, setMarker, setId, addClass, addText
+});
