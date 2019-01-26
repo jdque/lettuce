@@ -42,9 +42,9 @@ export function Reflector(props) {
 
       return Accessor(binding);
     },
-    update: (patch, quiet = false) => {
+    update: (patch = {}, quiet = false) => {
       if (typeof patch === 'function') {
-        patch = patch(props);
+        patch = patch(props) || {};
       }
 
       for (let key in patch) {

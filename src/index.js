@@ -1,4 +1,5 @@
 import Mousetrap from 'mousetrap';
+import Sortable from 'sortablejs';
 import H from './html_builder';
 import K from './konva_builder';
 import {Command, Commander} from './commander';
@@ -480,6 +481,7 @@ let addGridEvents = (group, cursor) => {
     let pos = group.getStage().getPointerPosition();
     let grid = group.getStage().getIntersection(pos, '.grid');
     if (grid) {
+      let snapPos = getSnapPos(grid, pos);
       cursor.setAttrs({
         x: snapPos.x,
         y: snapPos.y
@@ -873,6 +875,10 @@ function reflectAction(el, reflector, action) {
   });
 }
 
+function sortable(el, options = {}) {
+  Sortable.create(el, options);
+}
+
 function StageContainer({width, height}) {
   return H('div', {},
     [attr, {tabindex: 0}],
@@ -911,7 +917,20 @@ function PageTabBar({appState, onPageSelect}) {
   }
 
   return H('div', {},
-    [reflectAction, appState, [renderTabs]]
+    [reflectAction, appState, [renderTabs]],
+    [sortable, {
+      group: 'default',
+      onUpdate: (ev) => {
+        appState.update(({pages}) => {
+          let movedPage = pages[ev.oldIndex];
+          let dir = ev.oldIndex < ev.newIndex ? +1 : -1;
+          for (let idx = ev.oldIndex; idx !== ev.newIndex; idx += dir) {
+            pages[idx] = pages[idx + dir];
+          }
+          pages[ev.newIndex] = movedPage;
+        });
+      }
+    }]
   );
 }
 
@@ -936,7 +955,7 @@ function PageViewer({appState}) {
 function main() {
   let appState = Reflector({
     pages: App.pages,
-    selectedPage: App.pages[0]
+    selectedPage: App.pages[0],
   });
 
   let selectPage = (page) => {
@@ -950,15 +969,19 @@ function main() {
   });
 
   H(document.body, {},
-    H('div', {},
-      H(PageTabBar, {appState: appState, onPageSelect: selectPage},
-        [style, {paddingTop: '8px'}]
-      ),
-      [style, {backgroundColor: 'grey'}],
-    ),
-    H('div', {},
-      H(PageViewer, {appState: appState}),
-      [style, {padding: '8px'}]
+    H('div', {}, [style, {display: 'flex', flexDirection: 'row', width: '100vw', height: '100vh'}],
+      H('div', {}, [style, {display: 'flex', flexDirection: 'column', flexGrow: 1, flexBasis: 0, overflow: 'hidden'}],
+        H('div', {},
+          H(PageTabBar, {appState: appState, onPageSelect: selectPage},
+            [style, {paddingTop: '2px'}]
+          ),
+          [style, {backgroundColor: 'grey'}],
+        ),
+        H('div', {},
+          H(PageViewer, {appState: appState}),
+          [style, {padding: '8px', flexGrow: 1, flexBasis: 0}]
+        ),
+      )
     ),
     [style, {margin: 0}]
   );
