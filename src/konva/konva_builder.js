@@ -7,10 +7,7 @@ function isElement(any) {
 
 function createElement(tag, props, children) {
   let elem = null;
-  if (tag instanceof Konva.Node) {
-    elem = tag;
-  }
-  else if (typeof tag === 'string') {
+  if (typeof tag === 'string') {
     elem = new Konva[tag](props);
   }
   else if (typeof tag === 'function') {
@@ -36,6 +33,10 @@ function runAction(elem, action) {
   }
 }
 
+function setProps(elem, props) {
+  elem.setAttrs(props);
+}
+
 function getMarker(elem) {
   return elem.getAttr('__marker__');
 }
@@ -57,5 +58,5 @@ function addText(elem, text) {
 }
 
 export default Builder({
-  isElement, createElement, appendChild, runAction, getMarker, setMarker, setId, addClass, addText
+  isElement, createElement, appendChild, runAction, setProps, getMarker, setMarker, setId, addClass, addText
 });

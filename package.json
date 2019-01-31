@@ -15,7 +15,8 @@
     "konva": "^2.5.1",
     "mobx": "^5.6.0",
     "mousetrap": "^1.6.2",
-    "sortablejs": "^1.8.1"
+    "sortablejs": "^1.8.1",
+    "three": "^0.100.0"
   },
   "devDependencies": {
     "rollup": "^0.67.3",

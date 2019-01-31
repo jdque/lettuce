@@ -6,10 +6,7 @@ function isElement(any) {
 
 function createElement(tag, props, children) {
   let elem = null;
-  if (tag instanceof Element) {
-    elem = tag;
-  }
-  else if (typeof tag === 'string') {
+  if (typeof tag === 'string') {
     elem = document.createElement(tag);
     for (let name in props) {
       elem[name] = props[name];
@@ -38,6 +35,12 @@ function runAction(elem, action) {
   }
 }
 
+function setProps(elem, props) {
+  for (let name in props) {
+    elem[name] = props[name];
+  }
+}
+
 function getMarker(elem) {
   return elem.getAttribute('__marker__');
 }
@@ -59,5 +62,5 @@ function addText(elem, text) {
 }
 
 export default Builder({
-  isElement, createElement, appendChild, runAction, getMarker, setMarker, setId, addClass, addText
+  isElement, createElement, appendChild, runAction, setProps, getMarker, setMarker, setId, addClass, addText
 });

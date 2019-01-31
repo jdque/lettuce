@@ -1,8 +1,15 @@
 export function Builder(implementation) {
-  let {isElement, createElement, appendChild, runAction, getMarker, setMarker, setId, addText, addClass} = implementation;
+  let {isElement, createElement, appendChild, runAction, setProps, getMarker, setMarker, setId, addText, addClass} = implementation;
 
   let builder = (tag, props = {}, ...children) => {
-    let elem = createElement(tag, props, children);
+    let elem = null;
+    if (isElement(tag)) {
+      elem = tag;
+      setProps(elem, props);
+    }
+    else {
+      elem = createElement(tag, props, children);
+    }
 
     let markedChildren = {};
 

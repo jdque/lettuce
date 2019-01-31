@@ -77,19 +77,23 @@ let App = {
   pages:[
     {
       name: 'Hello',
-      elem: null
+      elem: null,
+      stage: null
     },
     {
       name: 'World',
-      elem: null
+      elem: null,
+      stage: null
     },
     {
       name: 'Again',
-      elem: null
+      elem: null,
+      stage: null
     },
     {
       name: 'Another',
-      elem: null
+      elem: null,
+      stage: null
     }
   ],
   shiftMod: false,
@@ -698,6 +702,7 @@ let addKeyboardEvents = (stage) => {
 
 let addDragDropEvents = (stage) => {
   stage.container().addEventListener('drop', (ev) => {
+    let {offsetX: dropX, offsetY: dropY} = ev;
     if (ev.dataTransfer.items) {
       for (let i = 0; i < ev.dataTransfer.items.length; i++) {
         if (ev.dataTransfer.items[i].kind === 'file') {
@@ -712,8 +717,8 @@ let addDragDropEvents = (stage) => {
                 image: image,
                 width: imageWidth,
                 height: imageHeight,
-                x: 500,
-                y: 10,
+                x: dropX,
+                y: dropY,
                 opacity: 0.5,
                 scaleX: 2.0,
                 scaleY: 2.0
@@ -722,7 +727,7 @@ let addDragDropEvents = (stage) => {
               foregroundGroup.add(regionImage);
               foregroundGroup.getLayer().draw();
 
-              let grid = K(GridContainer, {resolutionX: 16, resolutionY: 16, x: 500, y: 10, width: imageWidth * 2, height: imageHeight * 2});
+              let grid = K(GridContainer, {resolutionX: 16, resolutionY: 16, x: dropX, y: dropY, width: imageWidth * 2, height: imageHeight * 2});
               let backgroundGroup = stage.findOne('.id-background');
               backgroundGroup.add(grid);
               backgroundGroup.getLayer().draw();
@@ -763,8 +768,8 @@ let addDragDropEvents = (stage) => {
   });
 }
 
-function AttachStage(container, {width, height}) {
-  K('Stage', {container: container, width: width, height: height},
+function MainStage({container, width, height}) {
+  return K('Stage', {container: container, width: width, height: height},
     K('Layer', {},
       K('Group', {width: width, height: height}, '.id-background',
         K(GridContainer, {resolutionX: 16, resolutionY: 16, x: 10, y: 10, width: 256, height: 256}),
@@ -807,8 +812,7 @@ function sortable(el, options = {}) {
 function StageContainer({width, height}) {
   return H('div', {},
     [attr, {tabindex: 0}],
-    [style, {outline: 'none', cursor: 'none'}],
-    [AttachStage, {width: width, height: height}]
+    [style, {outline: 'none', cursor: 'none'}]
   );
 }
 
@@ -889,7 +893,10 @@ function main() {
 
   appState.reflect(({selectedPage}) => {
     if (selectedPage.elem == null) {
-      selectedPage.elem = H(StageContainer, {width: 800, height: 600});
+      selectedPage.elem = H(StageContainer);
+    }
+    if (selectedPage.stage == null) {
+      selectedPage.stage = K(MainStage, {container: selectedPage.elem, width: 800, height: 600});
     }
   });
 
@@ -912,4 +919,39 @@ function main() {
   );
 }
 
-main();
+import * as THREE from 'three';
+import T from './three/three_builder';
+import {pos, rot, scale, Sector} from './three/three_actions';
+
+function main2() {
+  let geometry = new THREE.PlaneGeometry(1, 1);
+  let material =  new THREE.MeshLambertMaterial({side: THREE.DoubleSide});
+
+  let camera = T('PerspectiveCamera', [75, window.innerWidth / window.innerHeight]);
+
+  let scene = T('Scene', [],
+    T('Group', [],
+      [pos, -2, -1, -6],
+      [rot, Math.PI / 4, Math.PI / 4, 0],
+      T('AxesHelper', [10]),
+      T('PointLight', [0xffffff, 2, 60, 2], [pos, -2, 6, 4]),
+      T('Group', [], [pos, 0.5, 0.5, 0],
+        T(Sector, [geometry, material], [pos, 0, 0, 0]),
+        T(Sector, [geometry, material], [pos, 1, 0, 0]),
+        T(Sector, [geometry, material], [pos, 0, 0, 1]),
+        T(Sector, [geometry, material], [pos, 1, 0, 1]),
+        T(Sector, [geometry, material], [pos, 2, 0, 0]),
+        T(Sector, [geometry, material], [pos, 1, 0, 2])
+      )
+    )
+  );
+
+  let renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  document.body.style.margin = 0;
+  document.body.appendChild(renderer.domElement);
+
+  renderer.render(scene, camera);
+}
+
+main2();
