@@ -919,39 +919,4 @@ function main() {
   );
 }
 
-import * as THREE from 'three';
-import T from './three/three_builder';
-import {pos, rot, scale, Sector} from './three/three_actions';
-
-function main2() {
-  let geometry = new THREE.PlaneGeometry(1, 1);
-  let material =  new THREE.MeshLambertMaterial({side: THREE.DoubleSide});
-
-  let camera = T('PerspectiveCamera', [75, window.innerWidth / window.innerHeight]);
-
-  let scene = T('Scene', [],
-    T('Group', [],
-      [pos, -2, -1, -6],
-      [rot, Math.PI / 4, Math.PI / 4, 0],
-      T('AxesHelper', [10]),
-      T('PointLight', [0xffffff, 2, 60, 2], [pos, -2, 6, 4]),
-      T('Group', [], [pos, 0.5, 0.5, 0],
-        T(Sector, [geometry, material], [pos, 0, 0, 0]),
-        T(Sector, [geometry, material], [pos, 1, 0, 0]),
-        T(Sector, [geometry, material], [pos, 0, 0, 1]),
-        T(Sector, [geometry, material], [pos, 1, 0, 1]),
-        T(Sector, [geometry, material], [pos, 2, 0, 0]),
-        T(Sector, [geometry, material], [pos, 1, 0, 2])
-      )
-    )
-  );
-
-  let renderer = new THREE.WebGLRenderer({antialias: true});
-  renderer.setSize(window.innerWidth,window.innerHeight);
-  document.body.style.margin = 0;
-  document.body.appendChild(renderer.domElement);
-
-  renderer.render(scene, camera);
-}
-
-main2();
+main();
